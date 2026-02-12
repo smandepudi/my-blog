@@ -1,8 +1,19 @@
-import { supabase } from '@/lib/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase';
 import Link from 'next/link';
 
-// This function fetches posts from database
-async function getPosts() {
+type Post = {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string;
+  published: boolean;
+  created_at: string;
+};
+
+async function getPosts(): Promise<Post[]> {
+  const supabase = await createSupabaseServerClient();
+  
   const { data, error } = await supabase
     .from('posts')
     .select('*')

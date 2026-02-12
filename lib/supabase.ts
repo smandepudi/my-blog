@@ -1,23 +1,38 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Server-side Supabase client for App Router
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-// ```
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Handle cookies in read-only context (Server Components)
+          }
+        },
+      },
+    }
+  );
+}
 
-// ---
+// Client-side Supabase client (for 'use client' components)
+import { createBrowserClient } from '@supabase/ssr';
 
-// ### **H. Add Sample Data:**
-
-// Go back to Supabase:
-
-// 1. Click **"Table Editor"** → **"posts"**
-// 2. Click **"Insert row"**
-// 3. Add a sample post:
-// ```
-// title: Getting Started with Next.js
-// slug: getting-started-nextjs
-// content: This is my first blog post! Next.js is amazing for building modern web applications.
-// excerpt: Learn how to get started with Next.js
-// published: true (check the box)
+export function createSupabaseBrowserClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
