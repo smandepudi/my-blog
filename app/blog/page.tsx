@@ -24,7 +24,7 @@ async function getPosts(): Promise<Post[]> {
     console.error('Error fetching posts:', error);
     return [];
   }
-
+  console.log('Fetched posts:', data);
   return data || [];
 }
 
