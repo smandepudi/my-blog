@@ -1,5 +1,6 @@
-import { createSupabaseServerClient } from '@/lib/supabase';
-import Link from 'next/link';
+import { createSupabaseServerClient } from "@/lib/supabase";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 type Post = {
   id: string;
@@ -11,64 +12,59 @@ type Post = {
   created_at: string;
 };
 
-async function getPosts(): Promise<Post[]> {
+async function getPost(slug: string): Promise<Post | null> {
   const supabase = await createSupabaseServerClient();
-  
-  const { data, error } = await supabase
-    .from('posts')
-    .select('*')
-    .eq('published', true)
-    .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching posts:', error);
-    return [];
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("slug", slug)
+    .eq("published", true)
+    .single();
+
+  if (error || !data) {
+    return null;
   }
-  console.log('Fetched posts:', data);
-  return data || [];
+
+  return data;
 }
 
-export default async function BlogPage() {
-  const posts = await getPosts();
+export default async function BlogPostPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const post = await getPost(slug);
+
+  if (!post) {
+    notFound();
+  }
 
   return (
     <main className="min-h-screen bg-white max-w-4xl mx-auto px-4 py-12">
-      <h1 className="text-4xl font-bold text-gray-900 mb-8">Blog</h1>
-      
-      {posts.length === 0 ? (
-        <p className="text-gray-600">No blog posts yet. Check back soon!</p>
-      ) : (
-        <div className="space-y-6">
-          {posts.map((post) => (
-            <article 
-              key={post.id}
-              className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition"
-            >
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-                {post.title}
-              </h2>
-              <p className="text-gray-600 mb-4">
-                {post.excerpt || 'Click to read more...'}
-              </p>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">
-                  {new Date(post.created_at).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </span>
-                <Link
-                  href={`/blog/${post.slug}`}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Read More →
-                </Link>
-              </div>
-            </article>
-          ))}
+      <Link
+        href="/blog"
+        className="text-blue-600 hover:text-blue-700 font-medium mb-8 inline-block"
+      >
+        ← Back to Blog
+      </Link>
+
+      <article>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
+
+        <p className="text-sm text-gray-400 mb-8">
+          {new Date(post.created_at).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </p>
+
+        <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
+          {post.content}
         </div>
-      )}
+      </article>
     </main>
   );
 }
