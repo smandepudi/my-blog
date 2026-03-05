@@ -1,70 +1,48 @@
 import { createSupabaseServerClient } from "@/lib/supabase";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 
 type Post = {
   id: string;
   title: string;
   slug: string;
   excerpt: string | null;
-  content: string;
-  published: boolean;
   created_at: string;
 };
 
-async function getPost(slug: string): Promise<Post | null> {
+export default async function BlogPage() {
   const supabase = await createSupabaseServerClient();
-
-  const { data, error } = await supabase
+  const { data: posts } = await supabase
     .from("posts")
     .select("*")
-    .eq("slug", slug)
     .eq("published", true)
-    .single();
+    .order("created_at", { ascending: false });
 
-  if (error || !data) {
-    return null;
-  }
-
-  return data;
-}
-
-export default async function BlogPostPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  const post = await getPost(slug);
-
-  if (!post) {
-    notFound();
+  if (!posts || posts.length === 0) {
+    return <p className="text-center py-12">No blog posts yet.</p>;
   }
 
   return (
-    <main className="min-h-screen bg-white max-w-4xl mx-auto px-4 py-12">
-      <Link
-        href="/blog"
-        className="text-blue-600 hover:text-blue-700 font-medium mb-8 inline-block"
-      >
-        ← Back to Blog
-      </Link>
-
-      <article>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
-
-        <p className="text-sm text-gray-400 mb-8">
-          {new Date(post.created_at).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
-
-        <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
-          {post.content}
-        </div>
-      </article>
+    <main className="max-w-3xl mx-auto px-4 py-12">
+      <h1 className="text-3xl font-bold mb-8">Blog</h1>
+      <div className="space-y-6">
+        {posts.map((post: Post) => (
+          <div key={post.id} className="border rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-2">{post.title}</h2>
+            {post.excerpt && (
+              <p className="text-gray-600 mb-3">{post.excerpt}</p>
+            )}
+            <p className="text-sm text-gray-400 mb-4">
+              {new Date(post.created_at).toLocaleDateString()}
+            </p>
+            <Link
+              href={`/blog/${post.slug}`}
+              className="text-blue-600 hover:underline"
+            >
+              Read More →
+            </Link>
+          </div>
+        ))}
+      </div>
     </main>
   );
 }

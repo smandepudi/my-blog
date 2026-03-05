@@ -6,7 +6,7 @@ export default function AboutPage() {
       <div className="space-y-6">
         <section className="bg-white border border-gray-200 rounded-lg p-8">
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-            👋 Hello, I'm [Your Name]
+            👋 Hello, I'm Sindhura Mandepudi
           </h2>
           <p className="text-gray-700 leading-relaxed mb-4">
             I'm a full-stack developer passionate about building modern web applications
@@ -52,10 +52,10 @@ export default function AboutPage() {
           <p className="text-gray-700">
             Feel free to reach out at{' '}
             <a 
-              href="mailto:your.email@example.com" 
+              href="mailto:sindhuramandepudi@curiousstack.com" 
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
-              your.email@example.com
+              sindhuramandepudi@curiousstack.com
             </a>
           </p>
         </section>

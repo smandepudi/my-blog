@@ -61,7 +61,7 @@ export default async function BlogPostPage({
           })}
         </p>
 
-        <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
+        <div className="max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap text-base">
           {post.content}
         </div>
       </article>

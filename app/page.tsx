@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function HomePage() {
   return (
     <main className="min-h-screen flex items-center justify-center">
@@ -8,9 +10,12 @@ export default function HomePage() {
         <p className="text-xl text-gray-600 mb-8">
           A modern blog built with Next.js, React, and TailwindCSS
         </p>
-        <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+        <Link
+          href="/blog"
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
           Get Started
-        </button>
+        </Link>
       </div>
     </main>
   );

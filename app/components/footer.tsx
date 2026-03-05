@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
@@ -20,19 +22,19 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <a href="/" className="text-gray-400 hover:text-white transition">
+                <Link href="/" className="text-gray-400 hover:text-white transition">
                   Home
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/blog" className="text-gray-400 hover:text-white transition">
+                <Link href="/blog" className="text-gray-400 hover:text-white transition">
                   Blog
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/about" className="text-gray-400 hover:text-white transition">
+                <Link href="/about" className="text-gray-400 hover:text-white transition">
                   About
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -42,8 +44,8 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-4">Connect</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <a 
-                  href="https://github.com/yourusername" 
+                <a
+                  href="https://github.com/smandepudi"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-gray-400 hover:text-white transition"
@@ -52,8 +54,8 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a 
-                  href="https://linkedin.com/in/yourusername" 
+                <a
+                  href="https://linkedin.com/in/yourusername"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-gray-400 hover:text-white transition"
@@ -62,8 +64,8 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a 
-                  href="mailto:your.email@example.com"
+                <a
+                  href="mailto:sindhuramandepudi@curiousstack.com"
                   className="text-gray-400 hover:text-white transition"
                 >
                   Email
@@ -75,7 +77,7 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 mt-8 pt-6 text-center text-sm text-gray-400">
-          <p>© {currentYear} MyBlog. All rights reserved.</p>
+          <p>© {currentYear} The Curious Stack. All rights reserved.</p>
         </div>
       </div>
     </footer>
