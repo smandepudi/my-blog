@@ -1,260 +1,237 @@
-# Fix Plan — "The Curious Stack" Blog
+# Feature Plan — Admin UI (Add / Edit / Delete Posts)
 
-Goal: get the blog running on Vercel with no errors, no broken UX, and no placeholder content.
-
-Build status as of writing: **passes** (`next build` succeeds locally).
-The issues below are grouped by severity. Fix them in order.
-
----
-
-## Status
-
-| #   | Issue                                                            | File                        | Priority | Status                                       |
-| --- | ---------------------------------------------------------------- | --------------------------- | -------- | -------------------------------------------- |
-| 1   | Missing env vars on Vercel                                       | Vercel dashboard            | BLOCKER  | ✓ Done — configured in Vercel dashboard      |
-| 2   | Stray `package.json` + `package-lock.json` in home directory    | `~/` (home dir)             | Low      | ✓ Fixed — files deleted                      |
-| 3   | "Get Started" button does nothing                                | `app/page.tsx`              | High     | ✓ Fixed                                      |
-| 4   | Footer internal links use `<a>` instead of `<Link>`              | `app/components/footer.tsx` | High     | ✓ Fixed                                      |
-| 5   | Body font hardcoded to Arial, overrides loaded Geist             | `app/globals.css`           | Medium   | ✓ Fixed                                      |
-| 6   | `prose` classes used but `@tailwindcss/typography` not installed | `app/blog/[slug]/page.tsx`  | Medium   | ✓ Fixed — manual Tailwind classes used       |
-| 7   | Site metadata is default Next.js boilerplate                     | `app/layout.tsx`            | Medium   | ✓ Fixed                                      |
-| 8   | About page has placeholder content                               | `app/about/page.tsx`        | Low      | ✓ Fixed                                      |
-| 9   | Footer has placeholder social links + wrong copyright name       | `app/components/footer.tsx` | Low      | ✓ Fixed — LinkedIn TBD                       |
-| ✓   | `/blog` listing page was showing single-post code                | `app/blog/page.tsx`         | FIXED    | Done                                         |
+**Goal:** Write and manage blog posts directly from the browser at `/admin`.
+**Auth:** Supabase magic link (email OTP — enter email, get one-click login link).
+**Editor:** Tiptap WYSIWYG (bold, italic, headings, lists, code blocks).
 
 ---
 
-## Fix 1 — Vercel environment variables ✓ DONE
+## Task Status
 
-Env vars are configured directly in the Vercel dashboard. `.env.local` being gitignored is
-correct and secure — Vercel injects the vars at build and runtime without needing the file committed.
-
-No action needed.
+| #  | Task                                                              | File(s)                                              | Status                |
+|----|-------------------------------------------------------------------|------------------------------------------------------|-----------------------|
+| 0  | Supabase dashboard setup — RLS policies + redirect URLs          | Supabase dashboard (manual)                          | Pending — do first    |
+| 1  | Install Tiptap packages                                           | `package.json`                                       | Pending               |
+| 2  | Add `createSupabaseMiddlewareClient()` to Supabase lib            | `lib/supabase.ts`                                    | Pending               |
+| 3  | Create middleware — protect `/admin/*`, refresh sessions          | `middleware.ts`                                      | Pending               |
+| 4  | Create auth callback route — exchange magic link for session      | `app/auth/callback/route.ts`                         | Pending               |
+| 5  | Create Server Actions — createPost, updatePost, deletePost        | `app/admin/actions.ts`                               | Pending               |
+| 6  | Create Tiptap WYSIWYG editor component                            | `app/components/TiptapEditor.tsx`                    | Pending               |
+| 7  | Create admin layout + header (sign out button)                    | `app/admin/layout.tsx`, `app/admin/AdminHeader.tsx`  | Pending               |
+| 8  | Create login page + magic link form                               | `app/admin/login/page.tsx`, `LoginForm.tsx`          | Pending               |
+| 9  | Create admin dashboard — all posts table with edit/delete         | `app/admin/page.tsx`, `DeletePostButton.tsx`         | Pending               |
+| 10 | Create new post form                                              | `app/admin/posts/new/page.tsx`                       | Pending               |
+| 11 | Create edit post form                                             | `app/admin/posts/[id]/edit/page.tsx`, `EditPostForm.tsx` | Pending          |
+| 12 | Update post detail page — render HTML instead of plain text       | `app/blog/[slug]/page.tsx`                           | Pending               |
+| 13 | Add `.input` CSS utility class                                    | `app/globals.css`                                    | Pending               |
 
 ---
 
-## Fix 2 — Delete stray package files from home directory
+## Task 0 — Supabase Dashboard Setup (manual — do before any code)
 
---- This is approved
+### A. Run this SQL in Supabase → SQL Editor
 
-**What was flagged:** During a local `npm run build`, Next.js printed:
+```sql
+-- Enable Row Level Security
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 
-> "We detected multiple lockfiles and selected `/Users/sindhuramandepudi/package-lock.json` as the root"
+-- Anonymous users can only read published posts
+CREATE POLICY "Public can read published posts"
+  ON posts FOR SELECT TO anon
+  USING (published = true);
 
-**Root cause:** There are two stray files sitting in your **home directory** (`~/`), not in this project:
+-- Authenticated admin has full access
+CREATE POLICY "Authenticated users have full access"
+  ON posts FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
 
-- `~/package.json`
-- `~/package-lock.json`
+-- Prevent duplicate slugs
+ALTER TABLE posts ADD CONSTRAINT posts_slug_unique UNIQUE (slug);
+```
 
-These were almost certainly created by accidentally running `npm install` from the wrong directory
-at some point. Their contents (`react-router-dom`, `styled-components`, `uuid`) have nothing to do
-with this blog — they are leftover from a different experiment.
+### B. Add redirect URLs in Supabase → Authentication → URL Configuration
 
-Next.js sees both your home `~/package-lock.json` and the project's `my-blog/package-lock.json`
-and gets confused about which one is the root, producing the warning.
+Add both of these to "Redirect URLs":
+- `http://localhost:3000/auth/callback`
+- `https://<your-vercel-domain>/auth/callback`
 
-**Fix:** Delete both stray files from the home directory:
+---
+
+## Task 1 — Install Tiptap packages
 
 ```bash
-rm ~/package.json
-rm ~/package-lock.json
-```
-
-**Why this is safe:** These files are not inside the blog project and are not tracked by this git
-repository. Deleting them only affects the stray files — the blog's own `package.json` and
-`package-lock.json` inside `my-blog/` are untouched.
-
-**Note:** This warning does not affect Vercel (Vercel only sees the repo folder), but cleaning it
-up locally removes the confusion and ensures `npm run build` runs cleanly on your machine.
-
----
-
-## Fix 3 — "Get Started" button on homepage does nothing ✓ APPROVED
-
-**Why:** It's a bare `<button>` element with no `onClick`, no `href`, no `Link` wrapper.
-Clicking it does nothing.
-
-**File:** `app/page.tsx`
-
-**Current:**
-
-```tsx
-<button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-  Get Started
-</button>
-```
-
-**Fix:** Replace with a Next.js `<Link>` pointing to `/blog`:
-
-```tsx
-import Link from "next/link";
-
-export default function HomePage() {
-  return (
-    <main className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-5xl font-bold text-gray-900 mb-4">
-          Welcome to My Blog
-        </h1>
-        <p className="text-xl text-gray-600 mb-8">
-          A modern blog built with Next.js, React, and TailwindCSS
-        </p>
-        <Link
-          href="/blog"
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          Get Started
-        </Link>
-      </div>
-    </main>
-  );
-}
+npm install @tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-placeholder @tiptap/extension-link
 ```
 
 ---
 
-## Fix 4 — Footer Quick Links use `<a>` instead of Next.js `<Link>` ✓ APPROVED
+## Task 2 — `lib/supabase.ts`
 
-**Why:** The three internal navigation links in the footer (Home, Blog, About) use raw `<a>` tags,
-which cause a full-page reload on every click instead of client-side navigation.
-
-**File:** `app/components/footer.tsx`
-
-**Current:**
-
-```tsx
-<a href="/" className="text-gray-400 hover:text-white transition">Home</a>
-<a href="/blog" className="text-gray-400 hover:text-white transition">Blog</a>
-<a href="/about" className="text-gray-400 hover:text-white transition">About</a>
-```
-
-**Fix:** Replace all three with `<Link>`:
-
-```tsx
-import Link from "next/link";
-
-<Link href="/" className="text-gray-400 hover:text-white transition">Home</Link>
-<Link href="/blog" className="text-gray-400 hover:text-white transition">Blog</Link>
-<Link href="/about" className="text-gray-400 hover:text-white transition">About</Link>
-```
+Add a new exported function `createSupabaseMiddlewareClient(request, response)` at the bottom.
+This uses the `NextRequest`/`NextResponse` cookie API instead of `next/headers` — required in middleware.
 
 ---
 
-## Fix 5 — Body font is hardcoded to Arial, Geist never applies ✓ APPROVED
+## Task 3 — `middleware.ts` (project root)
 
-**Why:** `globals.css` hardcodes `Arial` on `body`, overriding the Geist font CSS variable
-that `next/font` sets up in `layout.tsx`. Visitors always see Arial instead of Geist.
+- Runs on every request (broad matcher — required for Supabase session refresh to work on all routes)
+- Calls `supabase.auth.getUser()` — **not** `getSession()` (getUser verifies with Supabase server; getSession only reads the cookie and can be spoofed)
+- Redirects unauthenticated users on `/admin/*` → `/admin/login`
+- Redirects already-logged-in users on `/admin/login` → `/admin`
+- **Critical:** must return the same `response` object passed into `createSupabaseMiddlewareClient` — otherwise refreshed session tokens are lost
 
-**File:** `app/globals.css`
+---
 
-**Current:**
+## Task 4 — `app/auth/callback/route.ts`
+
+GET handler. When the user clicks the magic link in their email, Supabase redirects here with a `?code=` param.
+Calls `supabase.auth.exchangeCodeForSession(code)` then redirects to `/admin`.
+On failure, redirects to `/admin/login?error=auth_failed`.
+
+---
+
+## Task 5 — `app/admin/actions.ts`
+
+`"use server"` file. Three exported async functions:
+
+| Function | What it does |
+|----------|-------------|
+| `createPost(data)` | Inserts new row, auto-generates slug from title if not provided, calls `revalidatePath`, redirects to `/admin` |
+| `updatePost(id, data)` | Updates row by id, calls `revalidatePath` on `/blog`, `/blog/[slug]`, and `/admin`, redirects to `/admin` |
+| `deletePost(id)` | Deletes row by id, calls `revalidatePath`, no redirect (caller stays on dashboard) |
+
+Each function verifies `supabase.auth.getUser()` internally as a security double-check.
+
+---
+
+## Task 6 — `app/components/TiptapEditor.tsx`
+
+`"use client"` component. Props: `initialContent?: string` (HTML), `onChange: (html: string) => void`.
+
+Toolbar buttons: Bold, Italic, H2, H3, Bullet List, Ordered List, Blockquote, Code Block.
+
+Two critical implementation rules:
+1. Set `immediatelyRender: false` in `useEditor` — prevents SSR/hydration mismatch in Next.js App Router
+2. Every toolbar button must have `type="button"` — prevents accidental form submission
+
+---
+
+## Task 7 — `app/admin/layout.tsx` + `AdminHeader.tsx`
+
+**`layout.tsx`** (Server Component):
+- Calls `supabase.auth.getUser()` — redirects to login if no session (belt-and-suspenders beyond middleware)
+- Renders admin chrome (no public Navbar/Footer) + `{children}`
+
+**`AdminHeader.tsx`** (`"use client"`):
+- Shows user email + Sign Out button + link to View Site
+- Sign out: calls `supabase.auth.signOut()`, then `router.push('/admin/login')` + `router.refresh()`
+
+---
+
+## Task 8 — `app/admin/login/page.tsx` + `LoginForm.tsx`
+
+**`page.tsx`** (Server Component): simple wrapper with heading and centered card layout.
+
+**`LoginForm.tsx`** (`"use client"`):
+- Email input + submit button
+- Calls `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: '/auth/callback' } })`
+- Shows success state ("Check your email") after sending
+- Shows error message on failure
+
+---
+
+## Task 9 — `app/admin/page.tsx` + `DeletePostButton.tsx`
+
+**`page.tsx`** (Server Component):
+- Fetches ALL posts (no `published` filter) — shows drafts + published
+- Table with columns: Title/Slug, Status badge (Published/Draft), Date, Actions (Edit link + Delete button)
+- "New Post" button links to `/admin/posts/new`
+
+**`DeletePostButton.tsx`** (`"use client"`):
+- Uses `useTransition` for pending state
+- `window.confirm()` before calling `deletePost(postId)`
+- Shows "Deleting…" while pending
+
+---
+
+## Task 10 — `app/admin/posts/new/page.tsx`
+
+`"use client"` component (needs Tiptap + local state).
+
+Fields:
+| Field | Notes |
+|-------|-------|
+| Title | Required. Auto-generates slug as user types |
+| Slug | Required. Editable. Shows preview URL `/blog/{slug}` |
+| Excerpt | Optional textarea. Shown on blog listing cards |
+| Content | TiptapEditor component |
+| Publish | Checkbox — toggles `published` boolean |
+
+Calls `createPost()` on submit. Uses `useTransition` for loading state.
+
+---
+
+## Task 11 — `app/admin/posts/[id]/edit/page.tsx` + `EditPostForm.tsx`
+
+**`page.tsx`** (Server Component): fetches post by `id` param from Supabase → passes to `EditPostForm` as props.
+
+**`EditPostForm.tsx`** (`"use client"`): identical structure to the new post form but:
+- All fields pre-populated from `post` props
+- Passes `initialContent={post.content}` to TiptapEditor
+- Calls `updatePost(post.id, data)` on submit
+
+---
+
+## Task 12 — `app/blog/[slug]/page.tsx`
+
+Change content rendering from plain text to HTML:
+- Remove `whitespace-pre-wrap` and `{post.content}`
+- Use `dangerouslySetInnerHTML={{ __html: post.content }}`
+- Add Tailwind arbitrary selectors to style Tiptap HTML output (`[&_h2]:`, `[&_p]:`, `[&_code]:`, etc.)
+
+**Note on existing posts:** Posts previously stored as plain text will lose line breaks when rendered as HTML. Update them in Supabase dashboard to wrap paragraphs in `<p>` tags after this change.
+
+---
+
+## Task 13 — `app/globals.css`
+
+Add a reusable `.input` utility class used across all admin form inputs:
 
 ```css
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-```
-
-**Fix:**
-
-```css
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, sans-serif;
+.input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500;
 }
 ```
 
 ---
 
-## Fix 6 — `prose` classes on post content have no effect ✓ APPROVED (manual Tailwind)
+## New File Map
 
-**Why:** `app/blog/[slug]/page.tsx` uses `prose prose-lg` which requires `@tailwindcss/typography`
-— a plugin that is not installed. The classes do nothing and the post content is unstyled.
-
-**Decision:** Remove `prose` and use manual Tailwind classes. No plugin install needed.
-
-**File:** `app/blog/[slug]/page.tsx`
-
-**Current (line 64):**
-
-```tsx
-<div className="prose prose-lg max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
 ```
+middleware.ts                                          NEW
+app/
+├── auth/
+│   └── callback/route.ts                             NEW
+├── admin/
+│   ├── layout.tsx                                    NEW  (Server Component)
+│   ├── AdminHeader.tsx                               NEW  "use client"
+│   ├── page.tsx                                      NEW  (dashboard)
+│   ├── DeletePostButton.tsx                          NEW  "use client"
+│   ├── actions.ts                                    NEW  "use server"
+│   ├── login/
+│   │   ├── page.tsx                                  NEW
+│   │   └── LoginForm.tsx                             NEW  "use client"
+│   └── posts/
+│       ├── new/
+│       │   └── page.tsx                              NEW  "use client"
+│       └── [id]/
+│           └── edit/
+│               ├── page.tsx                          NEW  (Server Component)
+│               └── EditPostForm.tsx                  NEW  "use client"
+└── components/
+    └── TiptapEditor.tsx                              NEW  "use client"
 
-**Fix:**
-
-```tsx
-<div className="max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap text-base">
+lib/supabase.ts                                       MODIFIED
+app/blog/[slug]/page.tsx                              MODIFIED
+app/globals.css                                       MODIFIED
 ```
-
----
-
-## Fix 7 — Site metadata is default Next.js boilerplate ✓ APPROVED
-
-**Why:** The browser tab, search results, and social previews all show "Create Next App".
-
-**File:** `app/layout.tsx`
-
-**Current:**
-
-```typescript
-export const metadata: Metadata = {
-  title: "Create Next App",
-  description: "Generated by create next app",
-};
-```
-
-**Fix:**
-
-```typescript
-export const metadata: Metadata = {
-  title: "The Curious Stack",
-  description:
-    "A personal blog about software, technology, and building things on the web.",
-};
-```
-
----
-
-## Fix 8 — About page placeholder content ✓ APPROVED
-
-**File:** `app/about/page.tsx`
-
-| Placeholder                   | Replace with                         |
-| ----------------------------- | ------------------------------------ |
-| `👋 Hello, I'm [Your Name]`   | `👋 Hello, I'm Sindhura Mandepudi`   |
-| `your.email@example.com` (×2) | `sindhuramandepudi@curiousstack.com` |
-
-Bio paragraph and skills grid stay as-is (accurate enough for now).
-
----
-
-## Fix 9 — Footer placeholder links and wrong copyright name ✓ APPROVED
-
-**File:** `app/components/footer.tsx`
-
-| Placeholder                            | Replace with                                             |
-| -------------------------------------- | -------------------------------------------------------- |
-| `https://github.com/yourusername`      | `https://github.com/smandepudi`                          |
-| `https://linkedin.com/in/yourusername` | ⚠ LinkedIn URL not provided — update manually when ready |
-| `mailto:your.email@example.com`        | `mailto:sindhuramandepudi@curiousstack.com`              |
-| `© {currentYear} MyBlog.`              | `© {currentYear} The Curious Stack.`                     |
-
----
-
-## Summary — fixes to apply
-
-All fixes below are approved and ready to implement:
-
-| Order | Fix                                                  | File                        |
-| ----- | ---------------------------------------------------- | --------------------------- |
-| 1     | Replace `<button>` with `<Link href="/blog">`        | `app/page.tsx`              |
-| 2     | Replace `<a>` with `<Link>` for Quick Links          | `app/components/footer.tsx` |
-| 3     | Fix `font-family` in body to use Geist CSS variable  | `app/globals.css`           |
-| 4     | Remove `prose prose-lg`, use manual Tailwind classes | `app/blog/[slug]/page.tsx`  |
-| 5     | Update metadata title + description                  | `app/layout.tsx`            |
-| 6     | Replace name + email placeholders                    | `app/about/page.tsx`        |
-| 7     | Update GitHub, email, copyright in footer            | `app/components/footer.tsx` |
